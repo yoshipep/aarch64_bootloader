@@ -10,7 +10,6 @@ You'll need:
 
 - A Linux environment (Ubuntu 22.04+ recommended)
 - Rust (via [rustup.rs](https://rustup.rs))
-- QEMU (`qemu-system-aarch64`)
 - AArch64 cross-compilation tools (`gcc-aarch64-linux-gnu` or `binutils` + `gcc` built manually)
 
 Install required tools via apt:
@@ -19,7 +18,8 @@ Install required tools via apt:
 sudo apt update
 sudo apt install qemu-system-aarch64 gcc-14-aarch64-linux-gnu binutils-aarch64-linux-gnu
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup target add aarch64-unknown-none```
+rustup target add aarch64-unknown-none
+```
 
 🚀 Build & Run
 
