@@ -1,0 +1,17 @@
+[package]
+name = "aarch64_bootloader"
+version = "0.1.0"
+authors = ["Josep Comes <jcomes@jcomes.org>"]
+edition = "2024"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+debug = false
+
+[lib]
+crate-type = ["staticlib"]
