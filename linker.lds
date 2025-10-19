@@ -1,7 +1,13 @@
+#include "asm/boot.h"
+
+OUTPUT_FORMAT("elf64-littleaarch64")
+
+OUTPUT_ARCH("aarch64")
+
 ENTRY(_start)
 
 MEMORY {
-    RAM : ORIGIN = 0x40000000, LENGTH = 1M
+    RAM : ORIGIN = 0x40080000, LENGTH = 1M
 }
 
 SECTIONS {
@@ -27,8 +33,8 @@ SECTIONS {
         _bss_end = .;
     } > RAM
 
+    . = . + BOOT_STACK_SIZE;
+    . = ALIGN(4K);
+    boot_stack = .;
     _bootloader_end = .;
-    . = . + 4K;
-    . = ALIGN(16);
-    stack_top = .;
 }
