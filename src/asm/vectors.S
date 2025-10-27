@@ -1,7 +1,5 @@
 #include "asm/macro.h"
 
-.section .entry.text
-
 .global evt
 .align 11
 
@@ -46,7 +44,6 @@ evt:
 	bl do_serror
 	b exception_exit
 
-.type save_regs, @function
 save_regs:
 	alloc_stack 288
 	saveregs

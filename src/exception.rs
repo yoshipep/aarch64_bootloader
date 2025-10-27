@@ -1,5 +1,7 @@
 //! Exception handling module
 
+use crate::uart;
+
 /// Struct that represents the machine state
 ///
 /// This struct is used to store the registers of the cpu in a context switch
@@ -69,44 +71,193 @@ impl Regs {
             .zip(Self::NAMES.iter().copied())
             .map(|(val, name)| (name, val))
     }
+
+    /// Print all registers to UART
+    pub fn print(&self) {
+        uart::println(b"\nRegisters:");
+        for (name, value) in self.iter() {
+            uart::print(name.as_bytes());
+            uart::print(b": 0x");
+            print_hex_u64(value);
+            uart::print(b"\n");
+        }
+    }
 }
 
+/// Print a u64 value as a 16-digit hexadecimal number
+fn print_hex_u64(mut value: u64) {
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut buf = [0u8; 16];
+
+    // Convert to hex digits (right to left)
+    for i in (0..16).rev() {
+        buf[i] = HEX_CHARS[(value & 0xF) as usize];
+        value >>= 4;
+    }
+
+    uart::print(&buf);
+}
+
+fn print_u8_hex(val: u8) {
+    let mut buf = [0u8; 2];
+
+    for i in 0..2 {
+        let nibble = ((val >> ((1 - i) * 4)) & 0xF) as u8;
+        if nibble < 10 {
+            buf[i] = b'0' + nibble;
+        } else {
+            buf[i] = b'A' + (nibble - 10);
+        };
+    }
+
+    uart::print(&buf);
+}
+
+fn print_faulting_instr(elr: u64) {
+    let opcode: u32;
+    let addr = (elr & !3) as *const u32;
+
+    uart::print(b"Faulting instruction at 0x");
+    print_hex_u64(elr);
+    uart::print(b": ");
+    unsafe {
+        opcode = addr.read_volatile();
+    }
+
+    for i in 0..4 {
+        if i == 0 {
+            uart::print(b"[");
+            print_u8_hex((opcode >> (i * 8)) as u8);
+            uart::print(b"]")
+        } else {
+            print_u8_hex((opcode >> (i * 8)) as u8);
+        }
+
+        if i < 3 {
+            uart::print(b" ");
+        }
+    }
+
+    uart::print(b"\n");
+}
+
+fn print_regs(regs: *const Regs) {
+    // Print register dump
+    unsafe {
+        if let Some(regs) = regs.as_ref() {
+            regs.print();
+        }
+    }
+}
+
+/// Synchronous exception handler
 #[unsafe(no_mangle)]
-pub extern "C" fn do_bad_sync(regs: *const Regs) {
+pub extern "C" fn do_bad_sync(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"Bad mode in Synchronous Exception handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// IRQ handler
 #[unsafe(no_mangle)]
-pub fn do_bad_irq(regs: *const Regs) -> u32 {
+pub extern "C" fn do_bad_irq(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"Bad mode in IRQ handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// FIQ handler
 #[unsafe(no_mangle)]
 pub extern "C" fn do_bad_fiq(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"Bad mode in FIQ handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// SError handler
 #[unsafe(no_mangle)]
 pub extern "C" fn do_bad_serror(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"Bad mode in SError handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// Synchronous exception handler
 #[unsafe(no_mangle)]
-pub extern "C" fn do_sync(regs: *const Regs) {
+pub extern "C" fn do_sync(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"Synchronous Exception handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// IRQ handler
 #[unsafe(no_mangle)]
-pub fn do_irq(regs: *const Regs) -> u32 {
+pub extern "C" fn do_irq(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"IRQ handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// FIQ handler
 #[unsafe(no_mangle)]
 pub extern "C" fn do_fiq(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"FIQ handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }
 
+/// SError handler
 #[unsafe(no_mangle)]
 pub extern "C" fn do_serror(regs: *const Regs) -> ! {
+    let elr;
+
+    uart::println(b"SError handler");
+    unsafe {
+        elr = (&*regs).elr;
+    }
+    print_faulting_instr(elr);
+    print_regs(regs);
     panic!();
 }

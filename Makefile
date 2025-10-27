@@ -21,7 +21,7 @@ ASFLAGS = -I$(INCLUDE_DIR)
 CPP = aarch64-linux-gnu-cpp-14
 CPPFLAGS = -I$(INCLUDE_DIR)
 OBJCOPY = aarch64-linux-gnu-objcopy
-LD = rust-lld
+LD = aarch64-linux-gnu-ld
 QEMU = qemu-system-aarch64
 QEMU_FLAGS = -nographic -machine virt,gic-version=3,virtualization=on -cpu cortex-a57 -kernel $(BOOTLOADER_BIN) -s -S
 
@@ -46,8 +46,6 @@ OBJS := $(ASM_OBJS) $(RUST_OBJ)
 BOOTLOADER_ELF := bootloader.elf
 BOOTLOADER_BIN := bootloader.bin
 LINKER_SCRIPT := linker.lds
-
-
 
 #==============================================================================
 # BUILD TARGETS
@@ -75,7 +73,7 @@ $(RUST_OBJ): $(RUST_SRC)
 
 $(BOOTLOADER_ELF): $(OBJS) $(LINKER_SCRIPT).tmp
 	@echo "Linking bootloader ELF: $@"
-	$(LD) -flavor gnu -T $(LINKER_SCRIPT).tmp -o $(BOOTLOADER_ELF) $(OBJS)
+	$(LD) -T $(LINKER_SCRIPT).tmp -o $(BOOTLOADER_ELF) $(OBJS)
 
 $(BOOTLOADER_BIN): $(BOOTLOADER_ELF)
 	@echo "Extracting raw binary: $@"
@@ -93,6 +91,7 @@ clean:
 	rm -rf $(LINKER_SCRIPT).tmp
 	rm -rf $(DOC_DIR)
 	rm -rf $(BUILD_DIR)
+	rm -f $(BOOTLOADER_ELF)
 	rm -f $(BOOTLOADER_BIN)
 
 .PHONY: all clean

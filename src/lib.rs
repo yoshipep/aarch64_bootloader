@@ -7,7 +7,9 @@
 
 use core::panic::PanicInfo;
 
+pub mod elf;
 pub mod exception;
+pub mod uart;
 
 #[panic_handler]
 pub fn panic(_info: &PanicInfo) -> ! {

@@ -1,9 +1,12 @@
+#ifndef __ASSEMBLER__
+#error "This file should only be included in asm files"
+#endif // __ASSEMBLER__
+
 #ifndef MACRO_H_
 #define MACRO_H_
 
 /* clang-format off */
-#ifdef __ASSEMBLY__
-
+/* Macro to save all the registers */
 .macro saveregs
 	stp x0, x1, [sp, #0]
 	stp x2, x3, [sp, #16]
@@ -23,7 +26,7 @@
 	stp x30, xzr, [sp, #240]
 .endm
 
-# Macro to restore all the registers
+/* Macro to restore all the registers */
 .macro restoreregs
 	ldp x0, x1, [sp, #0]
 	ldp x2, x3, [sp, #16]
@@ -43,17 +46,17 @@
 	ldp x30, xzr, [sp, #240]
 .endm
 
-# Macro to allocate stack space
+/* Macro to allocate stack space */
 .macro alloc_stack, space
 	sub sp, sp, \space
 .endm
 
-# Macro to deallocate stack space
+/* Macro to deallocate stack space */
 .macro dealloc_stack, space
 	add sp, sp, \space
 .endm
 
-# Macro to check CurrentEL and jump to el_label
+/* Macro to check CurrentEL and jump to el_label */
 .macro switch_elx, reg, el1_lab, el2_lab, el3_lab
 	mrs \reg, CurrentEl
 	cmp \reg, #0x8
@@ -61,7 +64,5 @@
 	b.eq \el2_lab
 	b.gt \el3_lab
 .endm
-
-#endif // __ASSEMBLY__
 
 #endif // MACRO_H_
