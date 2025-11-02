@@ -1,10 +1,29 @@
-//! Exception handling module
+//! Exception handling for AArch64
+//!
+//! This module provides exception handlers for the AArch64 architecture,
+//! including synchronous exceptions, IRQ, FIQ, and SError handlers. When
+//! an exception occurs, the handlers print diagnostic information including
+//! the faulting instruction and register state before panicking.
+//!
+//! The module supports both "bad mode" handlers (for unexpected exception
+//! levels) and normal exception handlers.
 
-use crate::uart;
+use crate::utilities::print::{print_hex_u64, print_hex_u8};
+use crate::drivers::uart::pl011;
 
-/// Struct that represents the machine state
+/// CPU register state at the time of an exception
 ///
-/// This struct is used to store the registers of the cpu in a context switch
+/// This struct captures all general-purpose registers (x0-x30) and special
+/// system registers when an exception occurs. The layout matches the order
+/// in which registers are saved by the exception entry code.
+///
+/// # Fields
+///
+/// - `x0-x30`: General-purpose registers
+/// - `esr`: Exception Syndrome Register - describes the exception cause
+/// - `elr`: Exception Link Register - return address
+/// - `spsr`: Saved Program Status Register - saved processor state
+/// - `zr`: Zero register placeholder
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Regs {
@@ -74,73 +93,50 @@ impl Regs {
 
     /// Print all registers to UART
     pub fn print(&self) {
-        uart::println(b"\nRegisters:");
+        pl011::println(b"\nRegisters:");
         for (name, value) in self.iter() {
-            uart::print(name.as_bytes());
-            uart::print(b": 0x");
+            pl011::print(name.as_bytes());
+            pl011::print(b": 0x");
             print_hex_u64(value);
-            uart::print(b"\n");
+            pl011::print(b"\n");
         }
     }
 }
 
-/// Print a u64 value as a 16-digit hexadecimal number
-fn print_hex_u64(mut value: u64) {
-    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
-    let mut buf = [0u8; 16];
-
-    // Convert to hex digits (right to left)
-    for i in (0..16).rev() {
-        buf[i] = HEX_CHARS[(value & 0xF) as usize];
-        value >>= 4;
-    }
-
-    uart::print(&buf);
-}
-
-fn print_u8_hex(val: u8) {
-    let mut buf = [0u8; 2];
-
-    for i in 0..2 {
-        let nibble = ((val >> ((1 - i) * 4)) & 0xF) as u8;
-        if nibble < 10 {
-            buf[i] = b'0' + nibble;
-        } else {
-            buf[i] = b'A' + (nibble - 10);
-        };
-    }
-
-    uart::print(&buf);
-}
-
+/// Prints the faulting instruction at the exception address
+///
+/// Reads and displays the 32-bit instruction at the address stored in the
+/// Exception Link Register (ELR), which points to the instruction that
+/// caused the exception.
 fn print_faulting_instr(elr: u64) {
     let opcode: u32;
     let addr = (elr & !3) as *const u32;
 
-    uart::print(b"Faulting instruction at 0x");
+    pl011::print(b"Faulting instruction at 0x");
     print_hex_u64(elr);
-    uart::print(b": ");
+    pl011::print(b": ");
     unsafe {
         opcode = addr.read_volatile();
     }
 
     for i in 0..4 {
         if i == 0 {
-            uart::print(b"[");
-            print_u8_hex((opcode >> (i * 8)) as u8);
-            uart::print(b"]")
+            pl011::print(b"[");
+            print_hex_u8((opcode >> (i * 8)) as u8);
+            pl011::print(b"]")
         } else {
-            print_u8_hex((opcode >> (i * 8)) as u8);
+            print_hex_u8((opcode >> (i * 8)) as u8);
         }
 
         if i < 3 {
-            uart::print(b" ");
+            pl011::print(b" ");
         }
     }
 
-    uart::print(b"\n");
+    pl011::print(b"\n");
 }
 
+/// Prints all CPU registers from the saved register state
 fn print_regs(regs: *const Regs) {
     // Print register dump
     unsafe {
@@ -150,12 +146,16 @@ fn print_regs(regs: *const Regs) {
     }
 }
 
-/// Synchronous exception handler
+/// Handles synchronous exceptions from an unexpected exception level
+///
+/// This "bad mode" handler is called when a synchronous exception occurs
+/// from an exception level that should not normally generate exceptions.
+/// It prints diagnostic information and panics.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_bad_sync(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"Bad mode in Synchronous Exception handler");
+    pl011::println(b"Bad mode in Synchronous Exception handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -164,12 +164,16 @@ pub extern "C" fn do_bad_sync(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// IRQ handler
+/// Handles IRQ (Interrupt Request) from an unexpected exception level
+///
+/// This "bad mode" handler is called when an IRQ occurs from an exception
+/// level that should not normally generate interrupts. It prints diagnostic
+/// information and panics.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_bad_irq(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"Bad mode in IRQ handler");
+    pl011::println(b"Bad mode in IRQ handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -178,12 +182,16 @@ pub extern "C" fn do_bad_irq(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// FIQ handler
+/// Handles FIQ (Fast Interrupt Request) from an unexpected exception level
+///
+/// This "bad mode" handler is called when an FIQ occurs from an exception
+/// level that should not normally generate fast interrupts. It prints
+/// diagnostic information and panics.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_bad_fiq(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"Bad mode in FIQ handler");
+    pl011::println(b"Bad mode in FIQ handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -192,12 +200,16 @@ pub extern "C" fn do_bad_fiq(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// SError handler
+/// Handles SError (System Error) from an unexpected exception level
+///
+/// This "bad mode" handler is called when a system error occurs from an
+/// exception level that should not normally generate SErrors. It prints
+/// diagnostic information and panics.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_bad_serror(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"Bad mode in SError handler");
+    pl011::println(b"Bad mode in SError handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -206,12 +218,16 @@ pub extern "C" fn do_bad_serror(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// Synchronous exception handler
+/// Handles synchronous exceptions from the current exception level
+///
+/// Called when a synchronous exception occurs (e.g., undefined instruction,
+/// data abort, etc.). Prints diagnostic information including the faulting
+/// instruction and register state, then panics.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_sync(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"Synchronous Exception handler");
+    pl011::println(b"Synchronous Exception handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -220,12 +236,15 @@ pub extern "C" fn do_sync(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// IRQ handler
+/// Handles IRQ (Interrupt Request) from the current exception level
+///
+/// Called when an interrupt request is received. Prints diagnostic
+/// information and panics (as interrupt handling is not yet implemented).
 #[unsafe(no_mangle)]
 pub extern "C" fn do_irq(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"IRQ handler");
+    pl011::println(b"IRQ handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -234,12 +253,15 @@ pub extern "C" fn do_irq(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// FIQ handler
+/// Handles FIQ (Fast Interrupt Request) from the current exception level
+///
+/// Called when a fast interrupt request is received. Prints diagnostic
+/// information and panics (as FIQ handling is not yet implemented).
 #[unsafe(no_mangle)]
 pub extern "C" fn do_fiq(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"FIQ handler");
+    pl011::println(b"FIQ handler");
     unsafe {
         elr = (&*regs).elr;
     }
@@ -248,12 +270,15 @@ pub extern "C" fn do_fiq(regs: *const Regs) -> ! {
     panic!();
 }
 
-/// SError handler
+/// Handles SError (System Error) from the current exception level
+///
+/// Called when a system error occurs (e.g., asynchronous external abort).
+/// Prints diagnostic information and panics.
 #[unsafe(no_mangle)]
 pub extern "C" fn do_serror(regs: *const Regs) -> ! {
     let elr;
 
-    uart::println(b"SError handler");
+    pl011::println(b"SError handler");
     unsafe {
         elr = (&*regs).elr;
     }
